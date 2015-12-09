@@ -26,5 +26,13 @@ namespace WebApp360
         [OperationContract]
         [WebInvoke(UriTemplate="Test/PostTestValue?id={id}&placeholder={id2}")]
         string PostTestValue(string id, string id2);
+
+        [OperationContract]
+        [WebGet(UriTemplate = "GetGamesList", ResponseFormat=WebMessageFormat.Json)]
+        string GetGamesList();
+
+        [OperationContract]
+        [WebInvoke(UriTemplate = "PostGameInfo", RequestFormat=WebMessageFormat.Json)]
+        string PostGameInfo();
     }
 }

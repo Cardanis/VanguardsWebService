@@ -21,6 +21,7 @@ namespace WebApp360
 
         //Collection Names
         const string TEST_COLLECTION = "TestCollection";
+        const string GAMES_LIST_COLLECTION = "GamesListCollection";
         public VanguardsServices() 
         {
             mongoClient = new MongoClient();
@@ -53,6 +54,37 @@ namespace WebApp360
             BsonDocument doc = new BsonDocument(new List<BsonElement> { new BsonElement("ID", id), new BsonElement("BODY", body) });
 
             IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(id);
+            collection.InsertOneAsync(doc).Wait();
+            return "POSTED!";
+        }
+
+
+        public string GetGamesList()
+        {
+            //Grab the collection from the database
+            IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(GAMES_LIST_COLLECTION);
+
+            //We're creating a filter which is basically like our search params
+            //var filter = Builders<BsonDocument>.Filter.Eq("ID", id);
+
+            //Here we use that filter to search the collectionfor anything that matches it.  MongoDB is Asyncronous, but since we need to return the value
+            //We need to wait on the result, using .Result tells this thread to wait for the Find to return.
+            //Technically the Find method returns a collection of results, here I just use 'First' to get the first of those results.
+            //var doc = collection.Find(filter).FirstAsync().Result;
+            var docs = collection.Find(Builders<BsonDocument>.Filter.Empty).ToListAsync().Result;
+            return BsonExtensionMethods.ToJson(docs);
+        }
+
+
+        public string PostGameInfo()
+        {
+            //This gets the body of the post request
+            string body = Encoding.UTF8.GetString(OperationContext.Current.RequestContext.RequestMessage.GetBody<byte[]>());
+
+            //This creates the document that we're going to put in the collection.  Each BsonElement is a key/value pair that gets put in the json
+            BsonDocument doc = new BsonDocument(new List<BsonElement> { new BsonElement("BODY", body) });
+
+            IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(GAMES_LIST_COLLECTION);
             collection.InsertOneAsync(doc).Wait();
             return "POSTED!";
         }
