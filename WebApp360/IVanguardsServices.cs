@@ -20,11 +20,13 @@ namespace WebApp360
         
 
         [OperationContract]
-        [WebGet(UriTemplate="Test/GetTestValue?id={id}&placeholder={id2}")]
+        [WebGet(UriTemplate="Test/GetTestValue?id={id}&placeholder={id2}", 
+            RequestFormat=WebMessageFormat.Json, ResponseFormat=WebMessageFormat.Json)]
         string GetTestValue(string id, string id2);
 
         [OperationContract]
-        [WebInvoke(UriTemplate="Test/PostTestValue?id={id}&placeholder={id2}")]
+        [WebInvoke(UriTemplate = "Test/PostTestValue?id={id}&placeholder={id2}",
+            RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
         string PostTestValue(string id, string id2);
     }
 }
