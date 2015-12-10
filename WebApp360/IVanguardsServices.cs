@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.ServiceModel;
 using System.ServiceModel.Web;
@@ -34,7 +35,7 @@ namespace WebApp360
         string GetGamesList();
 
         [OperationContract]
-        [WebInvoke(UriTemplate = "PostGameInfo", RequestFormat=WebMessageFormat.Json)]
+        [WebInvoke(UriTemplate = "PostGameInfo", RequestFormat=WebMessageFormat.Json, BodyStyle=WebMessageBodyStyle.Wrapped)]
         string PostGameInfo();
     }
 }
