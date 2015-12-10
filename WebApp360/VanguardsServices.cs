@@ -8,6 +8,7 @@ using System.Linq;
 using System.ServiceModel;
 using System.ServiceModel.Activation;
 using System.ServiceModel.Channels;
+using System.ServiceModel.Web;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
@@ -76,8 +77,11 @@ namespace WebApp360
             try
             {
                 IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(GAMES_LIST_COLLECTION);
-
+                WebOperationContext.Current.OutgoingResponse.Headers
+                    .Add("Access-Control-Allow-Origin", "*");
                 List<BsonDocument> docs = collection.Find(Builders<BsonDocument>.Filter.Empty).ToListAsync().Result;
+                //OperationContext.Current.OutgoingMessageHeaders.Add(MessageHeader.CreateHeader("Access-Control-Allow-Origin", "", "*"));
+                //OperationContext.Current.OutgoingMessageProperties.Add("Access-Control-Allow-Origin", "*");
                 return BsonExtensionMethods.ToJson(docs);
             }
             catch (Exception e)
