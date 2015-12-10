@@ -39,6 +39,10 @@ namespace WebApp360
         string PostGameInfo();
 
         [OperationContract]
+        [WebInvoke(UriTemplate = "CreateUser", RequestFormat = WebMessageFormat.Json)]
+        string CreateUser();
+
+        [OperationContract]
         [WebGet(UriTemplate = "Login", ResponseFormat = WebMessageFormat.Json)]
         string Login();
     }
