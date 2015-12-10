@@ -37,5 +37,9 @@ namespace WebApp360
         [OperationContract]
         [WebInvoke(UriTemplate = "PostGameInfo", RequestFormat=WebMessageFormat.Json, BodyStyle=WebMessageBodyStyle.Bare)]
         string PostGameInfo();
+
+        [OperationContract]
+        [WebGet(UriTemplate = "Login", ResponseFormat = WebMessageFormat.Json)]
+        string Login();
     }
 }

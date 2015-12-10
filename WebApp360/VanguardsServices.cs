@@ -27,6 +27,7 @@ namespace WebApp360
         //Collection Names
         const string TEST_COLLECTION = "TestCollection";
         const string GAMES_LIST_COLLECTION = "GamesListCollection";
+        const string USERS_COLLECTION = "UsersCollection";
 
         const string ENCODING_KEY = "Encoder";
         const string ENCODING_TYPE_BYTESTREAM = "ByteStreamMessageEncoder";
@@ -117,6 +118,56 @@ namespace WebApp360
                 return e.Message;
             }
         }
+
+        public string CreateUser()
+        {
+            string bodyString = string.Empty;
+            try
+            {
+                Message m = OperationContext.Current.RequestContext.RequestMessage;
+                bodyString = ParseBodyFromMessage(m);
+                BsonDocument doc = BsonDocument.Parse(bodyString);
+                IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(USERS_COLLECTION);
+
+                collection.InsertOneAsync(doc).Wait(5000);
+                
+                return "UserCreated";
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(bodyString);
+                Console.WriteLine(e.Message);
+                return e.Message;
+            }
+        }
+
+        public string Login()
+        {
+            string bodyString = string.Empty;
+            try
+            {
+                Message m = OperationContext.Current.RequestContext.RequestMessage;
+                bodyString = ParseBodyFromMessage(m);
+                BsonDocument doc = BsonDocument.Parse(bodyString);
+                BsonElement user = doc.GetElement("User");
+                doc = BsonDocument.Parse(user.Value.AsString);
+                string username = doc.GetValue("username").AsString;
+                string password = doc.GetValue("password").AsString;
+                IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(USERS_COLLECTION);
+                var filter = Builders<BsonDocument>.Filter.Eq("User.username", username);
+                var filter2 = Builders<BsonDocument>.Filter.Eq("User.password", password);
+                var combinedFilter = filter & filter2;
+                var result = collection.Find(combinedFilter).FirstAsync().Result;
+                return result.ToString();
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(bodyString);
+                Console.WriteLine(e.Message);
+                return e.Message;
+            }
+        }
+
 
         static string ParseBodyFromMessage(Message m)
         {
