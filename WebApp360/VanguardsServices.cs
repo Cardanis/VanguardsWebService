@@ -32,6 +32,7 @@ namespace WebApp360
         const string ABILITY_SETS_USER = "AbilitySetsUser";
         const string ABILITY_SETS_GLOBAL = "AbilitySetsGlobal";
         const string DEATH_INFO_COLLECTION = "DeathInfoCollection";
+        const string AUTH_TOKENS = "AuthTokens";
 
         const string ENCODING_KEY = "Encoder";
         const string ENCODING_TYPE_BYTESTREAM = "ByteStreamMessageEncoder";
@@ -189,6 +190,12 @@ namespace WebApp360
                 Console.WriteLine(e.Message);
                 return e.Message;
             }
+        }
+
+        public string UsernameForAuthToken(string AuthToken)
+        {
+            IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(USERS_COLLECTION);
+            return "";
         }
 
         /// <summary>
