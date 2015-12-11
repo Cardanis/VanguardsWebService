@@ -142,6 +142,8 @@ namespace WebApp360
 
                 var result = collection.Find(filter).CountAsync().Result;
 
+                WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+
                 if (result <= 0)
                 {
                     WebOperationContext.Current.OutgoingResponse.Headers.Add("Status", "403");
@@ -149,7 +151,6 @@ namespace WebApp360
                 }
 
                 collection.InsertOneAsync(doc).Wait(5000);
-                WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
 
                 return "UserCreated";
             }
@@ -172,15 +173,14 @@ namespace WebApp360
                 var combinedFilter = filter & filter2;
                 var result = collection.Find(combinedFilter).FirstAsync().Result;
 
+                Console.WriteLine(bodyString + " " + result.ToString());
+                WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+
                 if (result < 1)
                 {
                     WebOperationContext.Current.OutgoingResponse.Headers.Add("Status", "403");
                     return "Login Failed";
                 }
-
-                Console.WriteLine(bodyString + " " + result.ToString());
-                WebOperationContext.Current.OutgoingResponse.Headers
-                    .Add("Access-Control-Allow-Origin", "*");
 
                 return result.ToString();
             }
