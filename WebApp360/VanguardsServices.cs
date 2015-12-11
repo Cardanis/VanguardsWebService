@@ -10,6 +10,7 @@ using System.ServiceModel.Activation;
 using System.ServiceModel.Channels;
 using System.ServiceModel.Web;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -28,6 +29,8 @@ namespace WebApp360
         const string TEST_COLLECTION = "TestCollection";
         const string GAMES_LIST_COLLECTION = "GamesListCollection";
         const string USERS_COLLECTION = "UsersCollection";
+        const string ABILITY_SETS_USER = "AbilitySetsUser";
+        const string ABILITY_SETS_GLOBAL = "AbilitySetsGlobal";
 
         const string ENCODING_KEY = "Encoder";
         const string ENCODING_TYPE_BYTESTREAM = "ByteStreamMessageEncoder";
@@ -83,7 +86,9 @@ namespace WebApp360
                 List<BsonDocument> docs = collection.Find(Builders<BsonDocument>.Filter.Empty).ToListAsync().Result;
                 //OperationContext.Current.OutgoingMessageHeaders.Add(MessageHeader.CreateHeader("Access-Control-Allow-Origin", "", "*"));
                 //OperationContext.Current.OutgoingMessageProperties.Add("Access-Control-Allow-Origin", "*");
-                return BsonExtensionMethods.ToJson(docs);
+                string json = ScrubIdsFromData(BsonExtensionMethods.ToJson(docs));
+                Console.WriteLine("SCRUBBED: " + json);
+                return json;
             }
             catch (Exception e)
             {
@@ -93,20 +98,15 @@ namespace WebApp360
         }
 
 
-        public string PostGameInfo()
+        public string PostGameInfo(Stream stream)
         {
             string bodyString = string.Empty;
             try
             {
-                Message m = OperationContext.Current.RequestContext.RequestMessage;
-                bodyString = ParseBodyFromMessage(m);
-                Console.WriteLine(bodyString);
-                //bodyString = new StreamReader(body).ReadToEnd();
-                Console.WriteLine(bodyString);
-                
+                bodyString = new StreamReader(stream).ReadToEnd();
+                Console.WriteLine(bodyString);                
                 //This creates the document that we're going to put in the collection.  Each BsonElement is a key/value pair that gets put in the json
-                BsonDocument doc = new BsonDocument(new List<BsonElement> { new BsonElement("BODY", bodyString) });
-                doc = BsonDocument.Parse(bodyString);
+                BsonDocument doc = BsonDocument.Parse(bodyString);
                 IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(GAMES_LIST_COLLECTION);
                 collection.InsertOneAsync(doc).Wait(5000);
                 return "Posted: " + bodyString;
@@ -119,13 +119,12 @@ namespace WebApp360
             }
         }
 
-        public string CreateUser()
+        public string CreateUser(Stream stream)
         {
             string bodyString = string.Empty;
             try
             {
-                Message m = OperationContext.Current.RequestContext.RequestMessage;
-                bodyString = ParseBodyFromMessage(m);
+                bodyString = new StreamReader(stream).ReadToEnd();
                 BsonDocument doc = BsonDocument.Parse(bodyString);
                 IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(USERS_COLLECTION);
 
@@ -141,23 +140,17 @@ namespace WebApp360
             }
         }
 
-        public string Login()
+        public string Login(string username, string password)
         {
             string bodyString = string.Empty;
             try
             {
-                Message m = OperationContext.Current.RequestContext.RequestMessage;
-                bodyString = ParseBodyFromMessage(m);
-                BsonDocument doc = BsonDocument.Parse(bodyString);
-                BsonElement user = doc.GetElement("User");
-                doc = BsonDocument.Parse(user.Value.AsString);
-                string username = doc.GetValue("username").AsString;
-                string password = doc.GetValue("password").AsString;
                 IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(USERS_COLLECTION);
                 var filter = Builders<BsonDocument>.Filter.Eq("User.username", username);
                 var filter2 = Builders<BsonDocument>.Filter.Eq("User.password", password);
                 var combinedFilter = filter & filter2;
                 var result = collection.Find(combinedFilter).FirstAsync().Result;
+                Console.WriteLine(bodyString + " " + result.ToString());
                 return result.ToString();
             }
             catch(Exception e)
@@ -168,9 +161,186 @@ namespace WebApp360
             }
         }
 
+        /// <summary>
+        /// Schema for User specific picks:
+        /// {
+        ///     Username : {username}
+        ///     AbilitySets : [{
+        ///                     {Ability1 : {ability1}, Ability2:{ability2}, Ability3:{ability3},Ability4:{ability4},TimesPicked:{num},LastPicked:{date}
+        ///                }]
+        ///     SingleAbilityPicks : [
+        ///                             {Ability:{name},TimesPicked:{name},LastPicked:{date}}
+        ///                         ]
+        /// }
+        /// 
+        /// Schema for global:
+        /// {
+        ///     AbilitySets : [{
+        ///                     {Ability1 : {ability1}, Ability2:{ability2}, Ability3:{ability3},Ability4:{ability4},TimesPicked:{num},LastPicked:{date}
+        ///                }]
+        /// }
+        /// 
+        /// Body expected to be:
+        /// {
+        ///     Ability1:{name},Ability2:{name},Ability3:{name},Ability4:{name},Date:{date},Username:{username}
+        /// }
+        /// </summary>
+        /// <param name="stream"></param>
+        /// <returns></returns>
+        public string PostAbilityData(Stream stream)
+        {
+            string bodyString = string.Empty;
+            try
+            {
+                bodyString = new StreamReader(stream).ReadToEnd();
+                BsonDocument doc = BsonDocument.Parse(bodyString);
+                doc = doc.GetValue("AbilityInfo").AsBsonDocument;
+                string username = doc.GetValue("Username").AsString;
+                string ability1 = doc.GetValue("Ability1").AsString;
+                string ability2 = doc.GetValue("Ability2").AsString;
+                string ability3 = doc.GetValue("Ability3").AsString;
+                string ability4 = doc.GetValue("Ability4").AsString;
+                string date = doc.GetValue("Date").AsString;
+
+                IMongoCollection<BsonDocument> userCollection = mongoDatabase.GetCollection<BsonDocument>(ABILITY_SETS_USER);
+                FilterDefinition<BsonDocument> filterForUser = Builders<BsonDocument>.Filter.Eq("Username", username);
+
+                long existingUser = userCollection.CountAsync(filterForUser).Result;
+                if (existingUser == 0)
+                {
+                    BsonDocument userDoc = new BsonDocument(new List<BsonElement>
+                        {
+                            new BsonElement("Username", username), new BsonElement("AbilitySets", "[]"), 
+                            new BsonElement("SingleAbilityPicks", "[]")
+                        }
+                    );
+                    Console.WriteLine("No user found, inserting: " + userDoc.ToJson());
+                    userCollection.InsertOneAsync(userDoc).Wait();
+                }
+
+                FilterDefinition<BsonDocument> matchinAbilitySet =
+                    Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability1", ability1) &
+                    Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability2", ability2) &
+                    Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability3", ability3) &
+                    Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability4", ability4);
+
+                long existingDefinition = userCollection.Find(matchinAbilitySet & filterForUser).CountAsync().Result;
+                if (existingDefinition > 0)
+                {
+                    UpdateDefinition<BsonDocument> inc = Builders<BsonDocument>.Update.Inc("AbilitySets.TimesPicked", 1);
+                    UpdateDefinition<BsonDocument> set = Builders<BsonDocument>.Update.Set("AbilitySets.LastPicked", date);
+                    
+                    userCollection.UpdateOneAsync(matchinAbilitySet & filterForUser, inc);
+                    userCollection.UpdateOneAsync(matchinAbilitySet & filterForUser, set);
+                    Console.WriteLine("Ability definition exists, updating");
+                }
+                else
+                {
+                    //Not found, create new
+                    BsonDocument newRow = new BsonDocument(new List<BsonElement>{
+                        new BsonElement("Ability1", ability1),
+                        new BsonElement("Ability2", ability2),
+                        new BsonElement("Ability3", ability3),
+                        new BsonElement("Ability4", ability4),
+                        new BsonElement("TimesPicked", 1),
+                        new BsonElement("LastPicked", date)
+                    });
+                    userCollection.UpdateOneAsync(filterForUser,
+                        Builders<BsonDocument>.Update.Push("AbilitySets", newRow));
+                    Console.WriteLine("Ability definition doesnt exist, creating " + newRow.ToJson());
+                }
+
+                /*bool found = false;
+                for (int i = 0; i < existingUserFullSet.Count; i++)
+                {
+                    BsonDocument abilityRow = existingUserFullSet[i].AsBsonDocument;
+                    string rowAb1 = doc.GetValue("Ability1").AsString;
+                    string rowAb2 = doc.GetValue("Ability2").AsString;
+                    string rowAb3 = doc.GetValue("Ability3").AsString;
+                    string rowAb4 = doc.GetValue("Ability4").AsString;
+                    if (ability1.Equals(rowAb1) && ability2.Equals(rowAb2) &&
+                        ability3.Equals(rowAb3) && ability4.Equals(rowAb4))
+                    {
+                        found = true;
+                        Builders<BsonDocument>.Update.Inc()
+                        break;
+                    }
+                }*/
+
+                    //collection.InsertOneAsync(doc).Wait(5000);
+                return "AbilityDataPosted";
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(bodyString);
+                Console.WriteLine(e.Message);
+                return e.Message;
+            }
+        }
+
+        public string RawPlayerAbilityData()
+        {
+            //Grab the collection from the database
+            try
+            {
+                IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(ABILITY_SETS_USER);
+                WebOperationContext.Current.OutgoingResponse.Headers
+                    .Add("Access-Control-Allow-Origin", "*");
+                List<BsonDocument> docs = collection.Find(Builders<BsonDocument>.Filter.Empty).ToListAsync().Result;
+                //OperationContext.Current.OutgoingMessageHeaders.Add(MessageHeader.CreateHeader("Access-Control-Allow-Origin", "", "*"));
+                //OperationContext.Current.OutgoingMessageProperties.Add("Access-Control-Allow-Origin", "*");
+                string json = ScrubIdsFromData(BsonExtensionMethods.ToJson(docs));
+                Console.WriteLine("SCRUBBED: " + json);
+                return json;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return e.Message;
+            }
+        }
+
+        static string ScrubIdsFromData(string data)
+        {
+            
+            string sharedPattern = "(ObjectId[(][\\][\"]([a-zA-Z0-9]*)[\\][\"][)])";
+            string innerPattern = "[\\][\"][a-zA-Z0-9]*[\\][\"]";
+            Regex regOuter = new Regex(sharedPattern);
+            Regex regInner = new Regex(innerPattern);
+
+            string newData = data;
+            Match outerMatch = regOuter.Match(data);
+            while (outerMatch.Success)
+            {
+                Console.WriteLine("Match Success");
+                string capturedVal = outerMatch.Captures[0].Value;
+                Match innerMatch = regInner.Match(capturedVal);
+
+                newData = newData.Replace(outerMatch.ToString(), innerMatch.ToString());
+
+                outerMatch = outerMatch.NextMatch();
+            }
+            return newData;
+        }
+
+        static string ParseBodyMessageAttempt2(WebOperationContext ctx)
+        {
+            Console.WriteLine(ctx.IncomingRequest.ContentLength + " " + ctx.IncomingRequest.ContentType);
+            foreach (string s in ctx.IncomingRequest.Headers.AllKeys)
+            {
+                Console.WriteLine(s + "+++" + ctx.IncomingRequest.Headers[s]);
+            }
+            string val = ctx.IncomingRequest.ToString();
+            Console.WriteLine(val);
+            return val;
+        }
 
         static string ParseBodyFromMessage(Message m)
         {
+            foreach (string key in m.Properties.Keys)
+            {
+                Console.WriteLine(key + "---" + m.Properties[key]);
+            }
             if (m.Properties.ContainsKey(ENCODING_KEY))
             {
                 string encodingType = m.Properties[ENCODING_KEY].ToString();
@@ -184,9 +354,10 @@ namespace WebApp360
                     throw new Exception("Handling JSON isn't supported cause C# is being dumb, use plaintext instead");
                 }
             }
-            else if(m.Properties.ContainsKey(ENCODING_UE4_PROPERTY_KEY))
+            else if(m.Properties.ContainsKey(ENCODING_UE4_PROPERTY_KEY) && m.Properties[ENCODING_UE4_PROPERTY_KEY].ToString().Contains('?'))
             {
                 string encoded = m.Properties[ENCODING_UE4_PROPERTY_KEY].ToString();
+                Console.WriteLine("RECEIVED: " + encoded);
                 encoded = encoded.Split('?')[1];
                 NameValueCollection col = HttpUtility.ParseQueryString(encoded);
                 List<BsonElement> build = new List<BsonElement>();
@@ -201,5 +372,6 @@ namespace WebApp360
             }
             return null;
         }
+
     }
 }
