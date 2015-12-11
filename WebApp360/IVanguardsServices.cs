@@ -49,6 +49,7 @@ namespace WebApp360
         [OperationContract]
         [WebInvoke(UriTemplate = "PostAbilityData")]
         string PostAbilityData(Stream stream);
+
         [OperationContract]
         [WebGet(UriTemplate = "RawPlayerAbilityData", ResponseFormat = WebMessageFormat.Json)]
         string RawPlayerAbilityData();
@@ -56,5 +57,9 @@ namespace WebApp360
         [OperationContract]
         [WebGet(UriTemplate = "DownloadGame", BodyStyle=WebMessageBodyStyle.Bare)]
         Stream DownloadGame();
+
+        [OperationContract]
+        [WebInvoke(UriTemplate = "PostDeathInfo")]
+        string PostDeathInfo(Stream stream);
     }
 }

@@ -31,6 +31,7 @@ namespace WebApp360
         const string USERS_COLLECTION = "UsersCollection";
         const string ABILITY_SETS_USER = "AbilitySetsUser";
         const string ABILITY_SETS_GLOBAL = "AbilitySetsGlobal";
+        const string DEATH_INFO_COLLECTION = "DeathInfoCollection";
 
         const string ENCODING_KEY = "Encoder";
         const string ENCODING_TYPE_BYTESTREAM = "ByteStreamMessageEncoder";
@@ -125,11 +126,20 @@ namespace WebApp360
             try
             {
                 bodyString = new StreamReader(stream).ReadToEnd();
-                BsonDocument doc = BsonDocument.Parse(bodyString);
+                Console.WriteLine(bodyString);
+                NameValueCollection nameValues = HttpUtility.ParseQueryString(bodyString);
+
+                BsonDocument doc = new BsonDocument();
+                foreach (string key in nameValues.AllKeys)
+                {
+                    doc.Add(new BsonElement(key, nameValues[key]));
+                }
+                
                 IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(USERS_COLLECTION);
 
                 collection.InsertOneAsync(doc).Wait(5000);
-                
+                WebOperationContext.Current.OutgoingResponse.Headers
+                    .Add("Access-Control-Allow-Origin", "*");
                 return "UserCreated";
             }
             catch (Exception e)
@@ -151,6 +161,8 @@ namespace WebApp360
                 var combinedFilter = filter & filter2;
                 var result = collection.Find(combinedFilter).FirstAsync().Result;
                 Console.WriteLine(bodyString + " " + result.ToString());
+                WebOperationContext.Current.OutgoingResponse.Headers
+                    .Add("Access-Control-Allow-Origin", "*");
                 return result.ToString();
             }
             catch(Exception e)
@@ -165,9 +177,9 @@ namespace WebApp360
         /// Schema for User specific picks:
         /// {
         ///     Username : {username}
-        ///     AbilitySets : [{
+        ///     AbilitySets : [
         ///                     {Ability1 : {ability1}, Ability2:{ability2}, Ability3:{ability3},Ability4:{ability4},TimesPicked:{num},LastPicked:{date}
-        ///                }]
+        ///                ]
         ///     SingleAbilityPicks : [
         ///                             {Ability:{name},TimesPicked:{name},LastPicked:{date}}
         ///                         ]
@@ -348,6 +360,29 @@ namespace WebApp360
                 return null;
             }
 
+        }
+
+        public string PostDeathInfo(Stream stream)
+        {
+            string bodyString = string.Empty;
+            try
+            {
+                bodyString = new StreamReader(stream).ReadToEnd();
+                Console.WriteLine(bodyString);
+                BsonDocument doc = BsonDocument.Parse(bodyString);
+                IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(DEATH_INFO_COLLECTION);
+
+                collection.InsertOneAsync(doc).Wait(5000);
+                WebOperationContext.Current.OutgoingResponse.Headers
+                    .Add("Access-Control-Allow-Origin", "*");
+                return "Death Info stored";
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(bodyString);
+                Console.WriteLine(e.Message);
+                return e.Message;
+            }
         }
 
         static string ScrubIdsFromData(string data)
