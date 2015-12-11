@@ -175,9 +175,11 @@ namespace WebApp360
         /// 
         /// Schema for global:
         /// {
-        ///     AbilitySets : [{
-        ///                     {Ability1 : {ability1}, Ability2:{ability2}, Ability3:{ability3},Ability4:{ability4},TimesPicked:{num},LastPicked:{date}
-        ///                }]
+        ///     
+        ///      {Ability1 : {ability1}, Ability2:{ability2}, Ability3:{ability3},Ability4:{ability4},TimesPicked:{num},LastPicked:{date}}
+        ///      or
+        ///      {Ability:{name},TimesPicked:{name},LastPicked:{date}}
+        ///  
         /// }
         /// 
         /// Body expected to be:
@@ -210,25 +212,30 @@ namespace WebApp360
                 {
                     BsonDocument userDoc = new BsonDocument(new List<BsonElement>
                         {
-                            new BsonElement("Username", username), new BsonElement("AbilitySets", "[]"), 
-                            new BsonElement("SingleAbilityPicks", "[]")
+                            new BsonElement("Username", username), 
+                            new BsonElement("AbilitySets", new BsonArray()), 
+                            new BsonElement("SingleAbilityPicks", new BsonArray())
                         }
                     );
                     Console.WriteLine("No user found, inserting: " + userDoc.ToJson());
                     userCollection.InsertOneAsync(userDoc).Wait();
                 }
+                FilterDefinition<BsonDocument> matchinAbility1 = Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability1", ability1);
+                FilterDefinition<BsonDocument> matchinAbility2 = Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability2", ability2);
+                FilterDefinition<BsonDocument> matchinAbility3 = Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability3", ability3);
+                FilterDefinition<BsonDocument> matchinAbility4 = Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability4", ability4);
 
                 FilterDefinition<BsonDocument> matchinAbilitySet =
-                    Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability1", ability1) &
-                    Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability2", ability2) &
-                    Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability3", ability3) &
-                    Builders<BsonDocument>.Filter.Eq("AbilitySets.Ability4", ability4);
+                    matchinAbility1 &
+                    matchinAbility2 &
+                    matchinAbility3 &
+                    matchinAbility4;
 
                 long existingDefinition = userCollection.Find(matchinAbilitySet & filterForUser).CountAsync().Result;
                 if (existingDefinition > 0)
                 {
-                    UpdateDefinition<BsonDocument> inc = Builders<BsonDocument>.Update.Inc("AbilitySets.TimesPicked", 1);
-                    UpdateDefinition<BsonDocument> set = Builders<BsonDocument>.Update.Set("AbilitySets.LastPicked", date);
+                    UpdateDefinition<BsonDocument> inc = Builders<BsonDocument>.Update.Inc("AbilitySets.$.TimesPicked", 1);
+                    UpdateDefinition<BsonDocument> set = Builders<BsonDocument>.Update.Set("AbilitySets.$.LastPicked", date);
                     
                     userCollection.UpdateOneAsync(matchinAbilitySet & filterForUser, inc);
                     userCollection.UpdateOneAsync(matchinAbilitySet & filterForUser, set);
@@ -245,29 +252,52 @@ namespace WebApp360
                         new BsonElement("TimesPicked", 1),
                         new BsonElement("LastPicked", date)
                     });
-                    userCollection.UpdateOneAsync(filterForUser,
+                    userCollection.FindOneAndUpdateAsync(filterForUser,
                         Builders<BsonDocument>.Update.Push("AbilitySets", newRow));
                     Console.WriteLine("Ability definition doesnt exist, creating " + newRow.ToJson());
                 }
 
-                /*bool found = false;
-                for (int i = 0; i < existingUserFullSet.Count; i++)
-                {
-                    BsonDocument abilityRow = existingUserFullSet[i].AsBsonDocument;
-                    string rowAb1 = doc.GetValue("Ability1").AsString;
-                    string rowAb2 = doc.GetValue("Ability2").AsString;
-                    string rowAb3 = doc.GetValue("Ability3").AsString;
-                    string rowAb4 = doc.GetValue("Ability4").AsString;
-                    if (ability1.Equals(rowAb1) && ability2.Equals(rowAb2) &&
-                        ability3.Equals(rowAb3) && ability4.Equals(rowAb4))
-                    {
-                        found = true;
-                        Builders<BsonDocument>.Update.Inc()
-                        break;
-                    }
-                }*/
+                FilterDefinition<BsonDocument>[] matchSingleAbilities = new FilterDefinition<BsonDocument>[]{
+                    Builders<BsonDocument>.Filter.Eq("SingleAbilityPicks.Ability", ability1),
+                    Builders<BsonDocument>.Filter.Eq("SingleAbilityPicks.Ability", ability2),
+                    Builders<BsonDocument>.Filter.Eq("SingleAbilityPicks.Ability", ability3),
+                    Builders<BsonDocument>.Filter.Eq("SingleAbilityPicks.Ability", ability4)
+                };
+                string[] singleAbilities = new string[]{
+                    ability1, ability2, ability3, ability4
+                };
 
-                    //collection.InsertOneAsync(doc).Wait(5000);
+                for (int i = 0; i < 4; i++)
+                {
+                    FilterDefinition<BsonDocument> filter = matchSingleAbilities[i];
+                    string name = singleAbilities[i];
+                    long existing = userCollection.Find(filter & filterForUser).CountAsync().Result;
+
+                    if (existing > 0)
+                    {
+                        Console.WriteLine("Single ability present, updating");
+                        UpdateDefinition<BsonDocument> inc = Builders<BsonDocument>.Update.Inc("SingleAbilityPicks.$.TimesPicked", 1);
+                        UpdateDefinition<BsonDocument> set = Builders<BsonDocument>.Update.Set("SingleAbilityPicks.$.LastPicked", date);
+
+                        userCollection.UpdateOneAsync(filter & filterForUser, inc);
+                        userCollection.UpdateOneAsync(filter & filterForUser, set);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Single ability missing");
+                        //Not found, create new
+                        BsonDocument newRow = new BsonDocument(new List<BsonElement>{
+                            new BsonElement("Ability", name),
+                            new BsonElement("TimesPicked", 1),
+                            new BsonElement("LastPicked", date)
+                        });
+                        userCollection.FindOneAndUpdateAsync(filterForUser,
+                            Builders<BsonDocument>.Update.Push("SingleAbilityPicks", newRow));
+                    }
+                }
+
+                IMongoCollection<BsonDocument> globalCollection = mongoDatabase.GetCollection<BsonDocument>(ABILITY_SETS_GLOBAL);
+
                 return "AbilityDataPosted";
             }
             catch (Exception e)
@@ -332,7 +362,6 @@ namespace WebApp360
             Match outerMatch = regOuter.Match(data);
             while (outerMatch.Success)
             {
-                Console.WriteLine("Match Success");
                 string capturedVal = outerMatch.Captures[0].Value;
                 Match innerMatch = regInner.Match(capturedVal);
 
