@@ -410,6 +410,23 @@ namespace WebApp360
             }
         }
 
+        public string GetDeathInfo()
+        {
+            IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(DEATH_INFO_COLLECTION);
+            List<BsonDocument> docs = collection.Find(Builders<BsonDocument>.Filter.Empty).ToListAsync().Result;
+            BsonArray arr = new BsonArray();
+            Console.WriteLine(arr.ToJson());
+            foreach (BsonDocument doc in docs)
+            {
+                Console.WriteLine(doc.ToJson());
+                arr.Add(doc["DeathInfo"].AsBsonDocument["DeathLocation"]);
+            }
+            WebOperationContext.Current.OutgoingResponse.Headers
+                    .Add("Access-Control-Allow-Origin", "*");
+            Console.WriteLine(arr.ToJson());
+            return arr.ToJson();
+        }
+
         static string ScrubIdsFromData(string data)
         {
             

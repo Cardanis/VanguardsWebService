@@ -61,5 +61,9 @@ namespace WebApp360
         [OperationContract]
         [WebInvoke(UriTemplate = "PostDeathInfo")]
         string PostDeathInfo(Stream stream);
+
+        [OperationContract]
+        [WebGet(UriTemplate = "GetDeathInfo")]
+        string GetDeathInfo();
     }
 }
