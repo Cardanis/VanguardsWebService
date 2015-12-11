@@ -52,5 +52,9 @@ namespace WebApp360
         [OperationContract]
         [WebGet(UriTemplate = "RawPlayerAbilityData", ResponseFormat = WebMessageFormat.Json)]
         string RawPlayerAbilityData();
+
+        [OperationContract]
+        [WebGet(UriTemplate = "DownloadGame", BodyStyle=WebMessageBodyStyle.Bare)]
+        Stream DownloadGame();
     }
 }

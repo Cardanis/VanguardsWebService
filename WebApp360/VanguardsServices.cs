@@ -300,6 +300,26 @@ namespace WebApp360
             }
         }
 
+        public Stream DownloadGame()
+        {
+            try
+            {
+                string fileName = "Vanguards.zip";
+                string fullPath = Path.GetFullPath(fileName);
+                Console.WriteLine("Path is: " + fullPath);
+                WebOperationContext.Current.OutgoingResponse.ContentType = "application/octet-stream";
+                WebOperationContext.Current.OutgoingResponse.Headers.Add("X-Filename", fileName);
+                WebOperationContext.Current.OutgoingResponse.Headers.Add("Content-Disposition: attachment; filename=\"Vanguards.zip\"");
+                return File.OpenRead(fullPath);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return null;
+            }
+
+        }
+
         static string ScrubIdsFromData(string data)
         {
             
