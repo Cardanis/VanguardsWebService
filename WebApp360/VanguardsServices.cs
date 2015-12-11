@@ -132,14 +132,24 @@ namespace WebApp360
                 BsonDocument doc = new BsonDocument();
                 foreach (string key in nameValues.AllKeys)
                 {
-                    doc.Add(new BsonElement(key, nameValues[key]));
+                    doc.Add(new BsonElement(key, nameValues[key])); 
                 }
                 
                 IMongoCollection<BsonDocument> collection = mongoDatabase.GetCollection<BsonDocument>(USERS_COLLECTION);
 
+                var filter = Builders<BsonDocument>.Filter.Eq("username", nameValues["username"]);
+
+                var result = collection.Find(filter).CountAsync().Result;
+
+                if (result <= 0)
+                {
+                    WebOperationContext.Current.OutgoingResponse.Headers.Add("Status", "403");
+                    return "Failed to create user. Username already taken.";
+                }
+
                 collection.InsertOneAsync(doc).Wait(5000);
-                WebOperationContext.Current.OutgoingResponse.Headers
-                    .Add("Access-Control-Allow-Origin", "*");
+                WebOperationContext.Current.OutgoingResponse.Headers.Add("Access-Control-Allow-Origin", "*");
+
                 return "UserCreated";
             }
             catch (Exception e)
@@ -160,9 +170,17 @@ namespace WebApp360
                 var filter2 = Builders<BsonDocument>.Filter.Eq("User.password", password);
                 var combinedFilter = filter & filter2;
                 var result = collection.Find(combinedFilter).FirstAsync().Result;
+
+                if (result < 1)
+                {
+                    WebOperationContext.Current.OutgoingResponse.Headers.Add("Status", "403");
+                    return "Login Failed";
+                }
+
                 Console.WriteLine(bodyString + " " + result.ToString());
                 WebOperationContext.Current.OutgoingResponse.Headers
                     .Add("Access-Control-Allow-Origin", "*");
+
                 return result.ToString();
             }
             catch(Exception e)
